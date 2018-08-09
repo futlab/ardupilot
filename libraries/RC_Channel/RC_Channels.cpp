@@ -123,5 +123,6 @@ RC_Channels::set_pwm_all(void)
 {
     for (uint8_t i=0; i<NUM_RC_CHANNELS; i++) {
         channels[i].set_pwm(channels[i].read());
+        channels[i].degrade_mavlink_add();
     }
 }

@@ -774,7 +774,7 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
     // check throttle
     if ((checks_to_perform == ARMING_CHECK_ALL) || (checks_to_perform & ARMING_CHECK_RC)) {
         // check throttle is not too low - must be above failsafe throttle
-        if (copter.g.failsafe_throttle != FS_THR_DISABLED && copter.channel_throttle->get_radio_in() < copter.g.failsafe_throttle_value) {
+        if (copter.g.failsafe_throttle != FS_THR_DISABLED && copter.channel_throttle->get_radio_in_no_ml() < copter.g.failsafe_throttle_value) {
             if (display_failure) {
                 #if FRAME_CONFIG == HELI_FRAME
                 gcs_send_text(MAV_SEVERITY_CRITICAL,"Arm: Collective below Failsafe");
@@ -788,7 +788,7 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
         // check throttle is not too high - skips checks if arming from GCS in Guided
         if (!(arming_from_gcs && (control_mode == GUIDED || control_mode == GUIDED_NOGPS))) {
             // above top of deadband is too always high
-            if (copter.get_pilot_desired_climb_rate(copter.channel_throttle->get_control_in()) > 0.0f) {
+            if (copter.get_pilot_desired_climb_rate(copter.channel_throttle->get_control_in_no_ml()) > 0.0f) {
                 if (display_failure) {
                     #if FRAME_CONFIG == HELI_FRAME
                     gcs_send_text(MAV_SEVERITY_CRITICAL,"Arm: Collective too high");
@@ -799,7 +799,7 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
                 return false;
             }
             // in manual modes throttle must be at zero
-            if ((copter.mode_has_manual_throttle(control_mode) || control_mode == DRIFT) && copter.channel_throttle->get_control_in() > 0) {
+            if ((copter.mode_has_manual_throttle(control_mode) || control_mode == DRIFT) && copter.channel_throttle->get_control_in_no_ml() > 0) {
                 if (display_failure) {
                     #if FRAME_CONFIG == HELI_FRAME
                     gcs_send_text(MAV_SEVERITY_CRITICAL,"Arm: Collective too high");

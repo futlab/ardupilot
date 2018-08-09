@@ -47,7 +47,7 @@ public:
 
     // calculate an angle given dead_zone and trim. This is used by the quadplane code
     // for hover throttle
-    int16_t     pwm_to_angle_dz_trim(uint16_t dead_zone, uint16_t trim);
+    int16_t     pwm_to_angle_dz_trim(int16_t radio_in, uint16_t dead_zone, uint16_t trim);
 
     /*
       return a normalised input for a channel, in range -1 to 1,
@@ -62,11 +62,11 @@ public:
     float       norm_input_dz();
 
     uint8_t     percent_input();
-    int16_t     pwm_to_range();
-    int16_t     pwm_to_range_dz(uint16_t dead_zone);
+    int16_t     pwm_to_range(int16_t radio_in);
+    int16_t     pwm_to_range_dz(int16_t radio_in, uint16_t dead_zone);
 
     // read the input value from hal.rcin for this channel
-    uint16_t    read() const;
+    uint16_t    read();
 
     // read input from hal.rcin and set as pwm input for channel
     void        input();
@@ -77,10 +77,14 @@ public:
     bool       in_trim_dz();
 
     int16_t    get_radio_in() const { return radio_in;}
+    int16_t    get_radio_in_no_ml() const { return radio_in_no_ml;}
     void       set_radio_in(int16_t val) {radio_in = val;}
 
     int16_t    get_control_in() const { return control_in;}
+    int16_t    get_control_in_no_ml() const { return control_in_no_ml;}
     void       set_control_in(int16_t val) { control_in = val;}
+    void       degrade_mavlink_add();
+    void       set_mavlink_add(int16_t val) { mavlink_add = val;}
 
     // get control input with zero deadzone
     int16_t     get_control_in_zero_dz(void);
@@ -104,9 +108,12 @@ private:
 
     // pwm is stored here
     int16_t     radio_in;
+    int16_t     radio_in_no_ml;
 
     // value generated from PWM normalised to configured scale
-    int16_t    control_in;
+    int16_t     control_in;
+    int16_t     control_in_no_ml;
+    int16_t     mavlink_add;
     
     AP_Int16    radio_min;
     AP_Int16    radio_trim;
@@ -121,8 +128,8 @@ private:
     // the input channel this corresponds to
     uint8_t     ch_in;
 
-    int16_t pwm_to_angle();
-    int16_t pwm_to_angle_dz(uint16_t dead_zone);
+    int16_t pwm_to_angle(int16_t radio_in);
+    int16_t pwm_to_angle_dz(int16_t radio_in, uint16_t dead_zone);
 };
 
 

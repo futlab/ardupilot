@@ -75,7 +75,7 @@ const AP_Param::GroupInfo RC_Channel::var_info[] = {
 
 
 // constructor
-RC_Channel::RC_Channel(void)
+RC_Channel::RC_Channel(void) : mavlink_add(0)
 {
     AP_Param::setup_object_defaults(this, var_info);
 }
@@ -113,10 +113,10 @@ RC_Channel::set_pwm(int16_t pwm)
     radio_in = pwm;
 
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
-        control_in = pwm_to_range();
+        control_in = pwm_to_range(radio_in);
     } else {
         //RC_CHANNEL_TYPE_ANGLE
-        control_in = pwm_to_angle();
+        control_in = pwm_to_angle(radio_in);
     }
 }
 
@@ -129,10 +129,10 @@ RC_Channel::set_pwm_no_deadzone(int16_t pwm)
     radio_in = pwm;
 
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
-        control_in = pwm_to_range_dz(0);
+        control_in = pwm_to_range_dz(radio_in, 0);
     } else {
         //RC_CHANNEL_ANGLE
-        control_in = pwm_to_angle_dz(0);
+        control_in = pwm_to_angle_dz(radio_in, 0);
     }
 }
 
@@ -182,7 +182,7 @@ void RC_Channel::save_eeprom(void)
   the current radio_in value using the specified dead_zone
  */
 int16_t
-RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim)
+RC_Channel::pwm_to_angle_dz_trim(int16_t _radio_in, uint16_t _dead_zone, uint16_t _trim)
 {
     int16_t radio_trim_high = _trim + _dead_zone;
     int16_t radio_trim_low  = _trim - _dead_zone;
@@ -192,10 +192,10 @@ RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim)
         return 0;
 
     int16_t reverse_mul = (reversed?-1:1);
-    if (radio_in > radio_trim_high) {
-        return reverse_mul * ((int32_t)high_in * (int32_t)(radio_in - radio_trim_high)) / (int32_t)(radio_max  - radio_trim_high);
-    } else if (radio_in < radio_trim_low) {
-        return reverse_mul * ((int32_t)high_in * (int32_t)(radio_in - radio_trim_low)) / (int32_t)(radio_trim_low - radio_min);
+    if (_radio_in > radio_trim_high) {
+        return reverse_mul * ((int32_t)high_in * (int32_t)(_radio_in - radio_trim_high)) / (int32_t)(radio_max  - radio_trim_high);
+    } else if (_radio_in < radio_trim_low) {
+        return reverse_mul * ((int32_t)high_in * (int32_t)(_radio_in - radio_trim_low)) / (int32_t)(radio_trim_low - radio_min);
     } else {
         return 0;
     }
@@ -206,9 +206,9 @@ RC_Channel::pwm_to_angle_dz_trim(uint16_t _dead_zone, uint16_t _trim)
   the current radio_in value using the specified dead_zone
  */
 int16_t
-RC_Channel::pwm_to_angle_dz(uint16_t _dead_zone)
+RC_Channel::pwm_to_angle_dz(int16_t _radio_in, uint16_t _dead_zone)
 {
-    return pwm_to_angle_dz_trim(_dead_zone, radio_trim);
+    return pwm_to_angle_dz_trim(_radio_in, _dead_zone, radio_trim);
 }
 
 /*
@@ -216,9 +216,9 @@ RC_Channel::pwm_to_angle_dz(uint16_t _dead_zone)
   the current radio_in value
  */
 int16_t
-RC_Channel::pwm_to_angle()
+RC_Channel::pwm_to_angle(int16_t _radio_in)
 {
-	return pwm_to_angle_dz(dead_zone);
+	return pwm_to_angle_dz(_radio_in, dead_zone);
 }
 
 
@@ -227,9 +227,9 @@ RC_Channel::pwm_to_angle()
   range, using the specified deadzone
  */
 int16_t
-RC_Channel::pwm_to_range_dz(uint16_t _dead_zone)
+RC_Channel::pwm_to_range_dz(int16_t _radio_in, uint16_t _dead_zone)
 {
-    int16_t r_in = constrain_int16(radio_in, radio_min.get(), radio_max.get());
+    int16_t r_in = constrain_int16(_radio_in, radio_min.get(), radio_max.get());
 
     if (reversed) {
 	    r_in = radio_max.get() - (r_in - radio_min.get());
@@ -248,18 +248,18 @@ RC_Channel::pwm_to_range_dz(uint16_t _dead_zone)
   range
  */
 int16_t
-RC_Channel::pwm_to_range()
+RC_Channel::pwm_to_range(int16_t _radio_in)
 {
-    return pwm_to_range_dz(dead_zone);
+    return pwm_to_range_dz(_radio_in, dead_zone);
 }
 
 
 int16_t RC_Channel::get_control_in_zero_dz(void)
 {
     if (type_in == RC_CHANNEL_TYPE_RANGE) {
-        return pwm_to_range_dz(0);
+        return pwm_to_range_dz(radio_in, 0);
     }
-    return pwm_to_angle_dz(0);
+    return pwm_to_angle_dz(radio_in, 0);
 }
 
 // ------------------------------------------
@@ -322,13 +322,27 @@ RC_Channel::percent_input()
 void
 RC_Channel::input()
 {
-    radio_in = hal.rcin->read(ch_in);
+    radio_in_no_ml = hal.rcin->read(ch_in);
+    if (type_in == RC_CHANNEL_TYPE_RANGE) {
+        control_in_no_ml = pwm_to_range(radio_in_no_ml);
+    } else {
+        //RC_CHANNEL_TYPE_ANGLE
+        control_in_no_ml = pwm_to_angle(radio_in_no_ml);
+    }    
+    radio_in = constrain_int16(radio_in_no_ml + mavlink_add, radio_min.get(), radio_max.get());
 }
 
 uint16_t
-RC_Channel::read() const
+RC_Channel::read()
 {
-    return hal.rcin->read(ch_in);
+    radio_in_no_ml = hal.rcin->read(ch_in);
+    if (type_in == RC_CHANNEL_TYPE_RANGE) {
+        control_in_no_ml = pwm_to_range(radio_in_no_ml);
+    } else {
+        //RC_CHANNEL_TYPE_ANGLE
+        control_in_no_ml = pwm_to_angle(radio_in_no_ml);
+    }    
+    return constrain_int16(radio_in_no_ml + mavlink_add, radio_min.get(), radio_max.get());
 }
 
 /*
@@ -339,3 +353,9 @@ bool RC_Channel::in_trim_dz()
     return is_bounded_int32(radio_in, radio_trim - dead_zone, radio_trim + dead_zone);
 }
 
+void RC_Channel::degrade_mavlink_add()
+{
+    mavlink_add -= (mavlink_add >> 6);
+    if (mavlink_add > 0)
+        mavlink_add--;
+}

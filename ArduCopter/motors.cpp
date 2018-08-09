@@ -14,12 +14,12 @@ void Copter::arm_motors_check()
     static int16_t arming_counter;
 
     // ensure throttle is down
-    if (channel_throttle->get_control_in() > 0) {
+    if (channel_throttle->get_control_in_no_ml() > 0) {
         arming_counter = 0;
         return;
     }
 
-    int16_t tmp = channel_yaw->get_control_in();
+    int16_t tmp = channel_yaw->get_control_in_no_ml();
 
     // full right
     if (tmp > 4000) {
